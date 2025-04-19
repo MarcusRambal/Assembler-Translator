@@ -8,5 +8,9 @@ import { Component, EventEmitter, Output } from '@angular/core';
   styleUrl: './assembler-translate-button.component.css'
 })
 export class assemblerTranslateButtonComponent {
-  @Output() translateAssemblertoMips = new EventEmitter<void>();
+  @Output() translateAssemblertoMIPS = new EventEmitter<void>();
+
+  onassemblerToMIPSClick(): void {
+    this.translateAssemblertoMIPS.emit();
+  }
 }
