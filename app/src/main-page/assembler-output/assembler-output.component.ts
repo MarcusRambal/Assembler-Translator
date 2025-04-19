@@ -1,4 +1,4 @@
-import { Component} from '@angular/core';
+import { Component, Input} from '@angular/core';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
 
 
@@ -10,5 +10,5 @@ import { ReactiveFormsModule, FormControl } from '@angular/forms';
   styleUrl: './assembler-output.component.css',
 })
 export class assemblerOutputComponent {
-    
+    @Input() assemblerOutputText: string = '';
 }
