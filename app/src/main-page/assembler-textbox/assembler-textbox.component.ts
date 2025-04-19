@@ -1,6 +1,6 @@
-import { Component} from '@angular/core';
+import { Component, inject, Output, EventEmitter} from '@angular/core';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
-
+import { FormInputManagerService } from '../../Shared/Services/FormInputManager/form-input-manager.service';
 
 @Component({
   selector: 'app-assembler-textbox',
@@ -10,5 +10,15 @@ import { ReactiveFormsModule, FormControl } from '@angular/forms';
   styleUrl: './assembler-textbox.component.css',
 })
 export class assemblerTextboxComponent {
-    textControl = new FormControl('');
+    
+    @Output() assemblerInputChange = new EventEmitter<string>();
+    assemblerUserInput = inject(FormInputManagerService).assemblerinputApp;
+
+    constructor() {
+    this.assemblerUserInput.valueChanges.subscribe((value: string | null) => {
+      if (value !== null) {
+        this.assemblerInputChange.emit(value); 
+      }
+    });
+  }
 }
