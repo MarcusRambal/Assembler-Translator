@@ -6,6 +6,7 @@ import { TexboxOutputComponent } from './texbox-output/texbox-output.component';
 import { RamdropComponent } from './ramdrop/ramdrop.component';
 import { SaveRamButtonComponent } from './save-ram-button/save-ram-button.component';
 import { TranslatorService } from '../Shared/Services/Translator/translator.service';
+import { AssemblerTranslatorService } from '../Shared/Services/assemblerTranslator/assembler-Translator.service';
 import { FormInputManagerService } from '../Shared/Services/FormInputManager/form-input-manager.service';
 import { InstructionTableComponent } from './instruction-table/instruction-table.component';
 import { TableInstructionService } from '../Shared/Services/tableInstruction/table-instruction.service';
@@ -36,7 +37,10 @@ export class MainPageComponent {
   inputText: string = '';
   output: string = '';
   parameter:string = '';
+  assemblerInputText: string = '';
+  assemblerOutputText: string = '';
   private translator = inject(TranslatorService);
+  private assemblerTranslator = inject(AssemblerTranslatorService);
   private inputManager = inject(FormInputManagerService).inputApp;
   private inputManagerIsHexToMips = inject(FormInputManagerService).isHexToMips;
   isHexToMIPS: boolean = false;
@@ -86,7 +90,12 @@ export class MainPageComponent {
       this.parameter = this.output
     }
   }
-  
- 
-  
+
+  onAssemblerInput(input: string): void {
+    this.assemblerInputText = input;
+  }
+
+  onAssemblerTranslate(): void {
+    this.assemblerOutputText = this.assemblerTranslator.translate(this.assemblerInputText);
+  }
 }
