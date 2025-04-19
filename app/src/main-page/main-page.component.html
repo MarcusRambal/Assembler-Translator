@@ -25,17 +25,18 @@
 
 <section class = "assembler-container">
     <div class = "assembler-input-textbox">
-        <app-assembler-textbox></app-assembler-textbox>
+        <app-assembler-textbox (assemblerInputChange) = "onAssemblerInput($event)"></app-assembler-textbox>
     </div>
 
     <div class = "assembler-translate">
-        <app-assembler-translate-button></app-assembler-translate-button> 
+        <app-assembler-translate-button (click) = "onAssemblerTranslate()"></app-assembler-translate-button> 
     </div>
 
     <div class="assembler-output">
-        <app-assembler-output></app-assembler-output>
+        <app-assembler-output [assemblerOutputText]="assemblerOutputText"></app-assembler-output>
     </div>
 </section>
+
 
 
 
