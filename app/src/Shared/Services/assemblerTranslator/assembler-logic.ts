@@ -55,7 +55,8 @@ const instructionMap: { [key: string]: Instruction } = {
     "blez": { opcode: "000110" },
     "j": { opcode: "000010" },
     "jal": { opcode: "000011" },
-    "lui": { opcode: "001111" }
+    "lui": { opcode: "001111" },
+    "nop": { opcode: "000000", funct: "000000" }
   };
 
   const registerMap: { [key: string]: string } = {
@@ -107,7 +108,7 @@ class Line {
     }
 
     private registerToNumber(reg: string): number {
-        const regName = reg.slice(1);
+        const regName = reg.slice(1); // Elimina el "$"
         const binaryCode = Object.entries(registerMap).find(([_, name]) => name === regName)?.[0];
         if (!binaryCode) throw new Error(`Registro inválido: ${reg}`);
         return parseInt(binaryCode, 2);
@@ -120,6 +121,11 @@ class Line {
     }
 
     private rHandler(op: string, operands: string[]): string {
+
+        if (op === "nop") {
+            return "00000000"; // Código hexadecimal para nop
+        }
+      
         const instr = this.getInstructionInfo(op);
         const [rd, rs, rt] = operands;
 
@@ -128,6 +134,7 @@ class Line {
         const rtNum = this.registerToNumber(rt);
         const rdNum = this.registerToNumber(rd);
 
+        
         const binaryValue = 
             (parseInt(instr.opcode, 2) << 26) | // Convertir opcode binario a número
             (rsNum << 21) |
@@ -166,6 +173,29 @@ class Line {
     
         return this.convertToHex(binaryValue);
     }
+
+
+    private jHandler(op: string, operands: string[]): string {
+        const instr = this.getInstructionInfo(op);
+        const target = operands[0];
+        
+        // Obtener dirección de la etiqueta
+        let targetAddress = this.symbolTable.get(target);
+        if (targetAddress === undefined) {
+            throw new Error(`Etiqueta no encontrada: ${target}`);
+        }
+    
+        // Calcular dirección relativa (en palabras)
+        const relativeAddress = targetAddress >>> 2; // Dividir entre 4
+        
+        // Construir valor binario: opcode (6) | address (26)
+        const binaryValue = 
+            (parseInt(instr.opcode, 2) << 26) |
+            (relativeAddress & 0x03ffffff); // Máscara de 26 bits
+        
+        return this.convertToHex(binaryValue);
+    }
+    
     private convertToHex(value: number): string {
         return (value >>> 0) // Asegura 32 bits sin signo
                .toString(16)
@@ -190,6 +220,10 @@ class Line {
                 output += this.iHandler(this.op, this.operands);
                 break;
                 
+            case LineType.J:
+                output += this.jHandler(this.op, this.operands);
+                break;
+
                 case LineType.SYSCALL: {
                     const binaryValue = 
                         (0x00 << 26) | // Opcode
@@ -334,7 +368,14 @@ function assembleFull(input: string): string {
                 line.lineType = LineType.J;
             } else if (line.op === 'syscall') {
                 line.lineType = LineType.SYSCALL;
-            } else {
+
+            } else if (line.op === 'nop') {
+                line.op = 'sll';
+                line.operands = ['$zero', '$zero', '0'];
+                line.lineType = LineType.R;
+            }
+            
+            else {
                 line.lineType = LineType.I;
             }
         }
@@ -347,14 +388,43 @@ function assembleFull(input: string): string {
 
 
 const testCode = `
+        .data                  
+        my_data: .word 0x0001           
+
+    .text
+    main:
+        j init_values         
+        add $t0, $t1, $t2    
+        j check_values        
+
+    init_values:
+        add $t3, $t1, $t2     
+        lui   $t4, 0x1234    
+        ori   $t4, $t4, 0x5678 
+        la $t0, my_data
+        j compute_more         
+
+    compute_more:
+        sub $t4, $t3, $t1     
+        andi $t5, $t4, 0xF   
+        j check_values       
+
+    check_values:
+        nop                    
+        add $t6, $t5, $t1      
+
+`;
+
+/*
+const testCode = `
     .data
     my_data: .word 0x1234
     
     .text
     main:
-        la $t0, my_data     
+        la $t0, my_data    # Debería generar lui + ori
 `;
-
+*/
 console.log("=== Resultado del Ensamblado ===");
 console.log(assembleFull(testCode));
   
