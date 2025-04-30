@@ -12,7 +12,7 @@ import { FormInputManagerService } from '../../Shared/Services/FormInputManager/
 export class assemblerTextboxComponent {
     
     @Output() assemblerInputChange = new EventEmitter<string>();
-    assemblerUserInput = inject(FormInputManagerService).assemblerinputApp;
+    assemblerUserInput = inject(FormInputManagerService).assemblerInputApp;
 
     constructor() {
     this.assemblerUserInput.valueChanges.subscribe((value: string | null) => {

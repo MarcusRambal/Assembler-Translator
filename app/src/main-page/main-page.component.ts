@@ -12,12 +12,14 @@ import { InstructionTableComponent } from './instruction-table/instruction-table
 import { TableInstructionService } from '../Shared/Services/tableInstruction/table-instruction.service';
 import { assemblerTextboxComponent } from './assembler-textbox/assembler-textbox.component';
 import { assemblerTranslateButtonComponent } from './assembler-translate-button/assembler-translate-button.component';
-import { assemblerOutputComponent } from './assembler-output/assembler-output.component';
-
+import { assemblerOutputContainer } from './assembler-output/output-container/output-container.component';
+import { infocardComponent } from './assembler-output/infocard/infocard.component';
+import { CommonModule } from '@angular/common';
 @Component({
   selector: 'app-main-page',
   standalone: true,
   imports: [
+    CommonModule,
     TextboxComponent,
     TranslateButtonComponent,
     SwitchComponent,
@@ -27,7 +29,8 @@ import { assemblerOutputComponent } from './assembler-output/assembler-output.co
     InstructionTableComponent,
     assemblerTextboxComponent,
     assemblerTranslateButtonComponent,
-    assemblerOutputComponent
+    assemblerOutputContainer,
+    infocardComponent,
   ],
   templateUrl: './main-page.component.html',
   styleUrls: ['./main-page.component.css'], 
@@ -38,7 +41,7 @@ export class MainPageComponent {
   output: string = '';
   parameter:string = '';
   assemblerInputText: string = '';
-  assemblerOutputText: string = '';
+  assemblerOutputDict: { [key: string]: string } = {};
   private translator = inject(TranslatorService);
   private assemblerTranslator = inject(AssemblerTranslatorService);
   private inputManager = inject(FormInputManagerService).inputApp;
@@ -94,8 +97,16 @@ export class MainPageComponent {
   onAssemblerInput(input: string): void {
     this.assemblerInputText = input;
   }
-
+  getKeys(obj: { [key: string]: string }): string[] {
+    return Object.keys(obj);
+  }
   onAssemblerTranslate(): void {
-    this.assemblerOutputText = this.assemblerTranslator.translate(this.assemblerInputText);
+    this.assemblerOutputDict = {
+      "Addi $s0, $0, 1":"00100000000100000000000000000001",
+      "Addi $s1, $0, 5":"00100000000100010000000000000101",
+      "Addi $s2, $0, 5":"00100000000100010000000000000101", 
+      "Addi $s1, $0, 3":"00100000000100010000000000000101",
+      "Addi $s1, $0, 6":"00100000000100010000000000000101",
+    }
   }
 }
