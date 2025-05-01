@@ -101,12 +101,6 @@ export class MainPageComponent {
     return Object.keys(obj);
   }
   onAssemblerTranslate(): void {
-    this.assemblerOutputDict = {
-      "Addi $s0, $0, 1":"00100000000100000000000000000001",
-      "Addi $s1, $0, 5":"00100000000100010000000000000101",
-      "Addi $s2, $0, 5":"00100000000100010000000000000101", 
-      "Addi $s1, $0, 3":"00100000000100010000000000000101",
-      "Addi $s1, $0, 6":"00100000000100010000000000000101",
-    }
+    this.assemblerOutputDict = this.assemblerTranslator.assembleTranslate(this.assemblerInputText);
   }
 }
