@@ -1,10 +1,10 @@
-interface Instruction {
+export interface Instruction {
     opcode: string;
     funct?: string;
 
 }
 
-const instructionMap: { [key: string]: Instruction } = {
+export const instructionMap: { [key: string]: Instruction } = {
     "add": { opcode: "000000", funct: "100000" },
     "sub": { opcode: "000000", funct: "100010" },
     "and": { opcode: "000000", funct: "100100" },
@@ -59,7 +59,7 @@ const instructionMap: { [key: string]: Instruction } = {
     "nop": { opcode: "000000", funct: "000000" }
   };
 
-  const registerMap: { [key: string]: string } = {
+export const registerMap: { [key: string]: string } = {
     "00000": "zero", "00001": "at", "00010": "v0", "00011": "v1",
     "00100": "a0", "00101": "a1", "00110": "a2", "00111": "a3",
     "01000": "t0", "01001": "t1", "01010": "t2", "01011": "t3",
@@ -430,7 +430,7 @@ class Line {
 
 
 // Función principal de ensamblado
-function assembleFull(input: string): string {
+export function assembleFull(input: string): string {
     const lines = processInput(input);
     const symbolTable = new Map<string, number>();
     const dataAddressStart = 0x00c00000;
@@ -681,9 +681,9 @@ const testCode = `
     fine: 
 
 `
-console.log("=== Resultado del Ensamblado ===");
+// console.log("=== Resultado del Ensamblado ===");
 
 //Llamar a la funcion principal
-console.log(assembleFull(testCode));
+// console.log(assembleFull(testCode));
 // const instructionNames: string[] = Object.keys(instructionMap);
 //  console.log(instructionNames);
