@@ -22,6 +22,22 @@
     font-family: "Nunito", sans-serif;
     
 }
+.divider{
+    border-top: 1px solid #7c2ae8d9;
+    margin: 30px auto;
+    width:75%;
+    text-align:center;
+}
+.subtitle{
+        color: #7c2ae8d9;
+        font-family: "Nunito", sans-serif;
+        font-size: 75px;
+        font-style: normal;
+        font-weight: 400;
+        line-height: normal;
+        text-align: center; 
+    
+}
 
 .translate {
     display: flex;
@@ -49,6 +65,7 @@
     justify-content: center;
     gap: 5rem;
     margin-top: 75px;
+    margin-bottom: 75px;
 }
 
 .assembler-input-textbox {
@@ -61,10 +78,11 @@
     margin-left: 180px;
     flex-direction: column; 
     align-items: center; 
+    margin-right: -70px;
     gap: 40px; 
 }
 
 .assembler-output {
     display: flex;
-    margin-left: 180px;
+    margin-left: 150px;
 }

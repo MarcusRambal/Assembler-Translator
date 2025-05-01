@@ -1,4 +1,3 @@
-
 <p class="title">MIPS CONVERTER</p>
 <section class="container">
     <div class="input-textbox">
@@ -22,7 +21,8 @@
 <section class ="save-ram">
     <app-ramdrop (valueFile)="onTextFile($event)"></app-ramdrop>
 </section>
-
+<hr class = "divider">
+<p class = "subtitle"> ASSEMBLER TRANSLATOR</p>
 <section class = "assembler-container">
     <div class = "assembler-input-textbox">
         <app-assembler-textbox (assemblerInputChange) = "onAssemblerInput($event)"></app-assembler-textbox>
@@ -33,7 +33,10 @@
     </div>
 
     <div class="assembler-output">
-        <app-assembler-output [assemblerOutputText]="assemblerOutputText"></app-assembler-output>
+        <assembler-output-container>
+            <infocard *ngFor = "let key of getKeys(assemblerOutputDict)" [header]="key" [text]="assemblerOutputDict[key]">
+            </infocard>
+        </assembler-output-container>
     </div>
 </section>
 
@@ -41,5 +44,5 @@
 
 
 
-    
+
 

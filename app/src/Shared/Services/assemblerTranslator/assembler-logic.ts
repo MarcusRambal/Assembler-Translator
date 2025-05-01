@@ -121,30 +121,46 @@ class Line {
     }
 
     private rHandler(op: string, operands: string[]): string {
+    if (op === "nop") {
+        return "00000000"; // Código hexadecimal para nop
+    }
 
-        if (op === "nop") {
-            return "00000000"; // Código hexadecimal para nop
-        }
-      
-        const instr = this.getInstructionInfo(op);
-        const [rd, rs, rt] = operands;
+    const instr = this.getInstructionInfo(op);
+    const funct = parseInt(instr.funct!, 2);
 
-        const funct = parseInt(instr.funct!, 2); // Convertir binario a número
+    // Caso especial: mult y div solo usan rs y rt
+    if (op === "mult" || op === "div") {
+        const [rs, rt] = operands; // No hay rd
         const rsNum = this.registerToNumber(rs);
         const rtNum = this.registerToNumber(rt);
-        const rdNum = this.registerToNumber(rd);
 
-        
         const binaryValue = 
-            (parseInt(instr.opcode, 2) << 26) | // Convertir opcode binario a número
+            (parseInt(instr.opcode, 2) << 26) |
             (rsNum << 21) |
             (rtNum << 16) |
-            (rdNum << 11) |
-            (0 << 6) | // shamt (no usado)
+            (0 << 11) | // rd = 0
+            (0 << 6) |  // shamt = 0
             funct;
 
         return this.convertToHex(binaryValue);
     }
+
+    // Caso normal (add, sub, etc.)
+    const [rd, rs, rt] = operands;
+    const rsNum = this.registerToNumber(rs);
+    const rtNum = this.registerToNumber(rt);
+    const rdNum = this.registerToNumber(rd);
+
+    const binaryValue = 
+        (parseInt(instr.opcode, 2) << 26) |
+        (rsNum << 21) |
+        (rtNum << 16) |
+        (rdNum << 11) |
+        (0 << 6) | // shamt = 0
+        funct;
+
+    return this.convertToHex(binaryValue);
+}
 
     private iHandler(op: string, operands: string[]): string {
         const instr = this.getInstructionInfo(op);
@@ -157,6 +173,29 @@ class Line {
             // Formato: lui rt, imm
             rtNum = this.registerToNumber(operands[0]);
             immNum = parseInt(operands[2], 16); // Usar base 16 para hex
+        } else if (op === "beq" || op === "bne") {
+            // Formato: beq/bne rs, rt, etiqueta
+        const [rs, rt, label] = operands;
+        rsNum = this.registerToNumber(rs);
+        rtNum = this.registerToNumber(rt);
+
+        // Obtener dirección del label
+        const targetAddress = this.symbolTable.get(label);
+        if (targetAddress === undefined) {
+            throw new Error(`Etiqueta no encontrada: ${label}`);
+        }
+
+        // Calcular offset relativo (target - pc - 4) / 4
+        const currentPC = this.memAddress + 4; // PC + 4
+        const offset = Math.floor((targetAddress - currentPC) / 4);
+        
+        // Validar rango de 16 bits con signo
+        if (offset < -32768 || offset > 32767) {
+            throw new Error(`Offset de salto demasiado grande: ${offset}`);
+        }
+
+        immNum = offset & 0xffff; // Máscara de 16 bits
+        
         } else {
             // Resto de instrucciones I-Type
             const [rt, rs, imm] = operands;
@@ -386,35 +425,57 @@ function assembleFull(input: string): string {
     return output;
 }
 
-
+/*
 const testCode = `
-        .data                  
-        my_data: .word 0x0001           
-
+                .data                   
     .text
     main:
-        j init_values         
-        add $t0, $t1, $t2    
-        j check_values        
+        addi $s0, $zero, 1       # $s0 = 1
+        addi $s1, $zero, 5       # $s1 = 5
+        addi $s2, $zero, 10      # $s2 = 10
+        addi $t0, $zero, 1       # $t0 = 1
+        addi $t1, $zero, 2       # $t1 = 2
+        addi $t2, $zero, 3       # $t2 = 3
+        addi $t3, $zero, 4       # $t3 = 4
+        j fine                   # Salto a "fine"
 
-    init_values:
-        add $t3, $t1, $t2     
-        lui   $t4, 0x1234    
-        ori   $t4, $t4, 0x5678 
-        la $t0, my_data
-        j compute_more         
+    somma:
+        add $s3, $s1, $s2        # $s3 = $s1 + $s2
+        j fine                   # Salto a "fine"
 
-    compute_more:
-        sub $t4, $t3, $t1     
-        andi $t5, $t4, 0xF   
-        j check_values       
+    sottrazione:
+        sub $s3, $s1, $s2        # $s3 = $s1 - $s2
+        j fine                   # Salto a "fine"
 
-    check_values:
-        nop                    
-        add $t6, $t5, $t1      
+    molt:
+        mult $s1, $s2            # $s1 * $s2, resultado en HI y LO
+        j fine                   # Salto a "fine"
+
+    div:
+        div $s1, $s2             # $s1 / $s2, cociente en LO y residuo en HI
+        j fine                   # Salto a "fine"
+
+    or:
+        or $s3, $s1, $s2         # $s3 = $s1 | $s2 (OR bit a bit)
+        j fine                   # Salto a "fine"
+
+    and:
+        and $s3, $s1, $s2        # $s3 = $s1 & $s2 (AND bit a bit)
+        j fine                   # Salto a "fine"
+
+    andi:
+        andi $s3, $s1, 0x0F      # $s3 = $s1 & 0x0F (AND con un valor inmediato)
+        j fine                   # Salto a "fine"
+
+    xor:
+        xor $s3, $s1, $s2        # $s3 = $s1 ^ $s2 (XOR bit a bit)
+        j fine                   # Salto a "fine"
+
+    fine:
+
 
 `;
-
+*/
 /*
 const testCode = `
     .data
@@ -425,6 +486,18 @@ const testCode = `
         la $t0, my_data    # Debería generar lui + ori
 `;
 */
+
+const testCode = `
+    .text
+    main:
+        addi $s0, $zero, 5    
+        addi $s1, $zero, 5   
+        beq  $s0, $s1, equal  
+        addi $t0, $zero, 1  
+    equal:
+        addi $t0, $zero, 42   
+        bne  $s0, $s1, main  
+`;
+
 console.log("=== Resultado del Ensamblado ===");
 console.log(assembleFull(testCode));
-  
