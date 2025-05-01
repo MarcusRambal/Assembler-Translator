@@ -122,14 +122,41 @@ class Line {
 
     private rHandler(op: string, operands: string[]): string {
     if (op === "nop") {
-        return "00000000"; // Código hexadecimal para nop
+        return "00000000"; 
     }
 
     const instr = this.getInstructionInfo(op);
     const funct = parseInt(instr.funct!, 2);
 
+     if (op === "jr") {
+        const [rs] = operands;
+        const rsNum = this.registerToNumber(rs);
+        
+        return this.convertToHex(
+            (parseInt(instr.opcode, 2) << 26) |
+            (rsNum << 21) | (0 << 16) | (0 << 11) | (0 << 6) | funct
+        );
+    }
+    else if (op === "jalr") {
+        let rdNum: number, rsNum: number;
+        
+        if (operands.length === 1) {
+            rsNum = this.registerToNumber(operands[0]);
+            rdNum = 31;
+        } else {
+            const [rd, rs] = operands; 
+            rdNum = this.registerToNumber(rd);
+            rsNum = this.registerToNumber(rs);
+        }
+
+        return this.convertToHex(
+            (parseInt(instr.opcode, 2) << 26) |
+            (rsNum << 21) | (0 << 16) | (rdNum << 11) | (0 << 6) | funct
+        );
+    }
+
     // Caso especial: mult y div solo usan rs y rt
-    if (op === "mult" || op === "div") {
+    if (["mult", "multu", "div", "divu"].includes(op)){
         const [rs, rt] = operands; // No hay rd
         const rsNum = this.registerToNumber(rs);
         const rtNum = this.registerToNumber(rt);
@@ -143,6 +170,78 @@ class Line {
             funct;
 
         return this.convertToHex(binaryValue);
+    } else if  (op === "mfhi" || op === "mflo") {
+        // Formato: rd
+        const [rd] = operands;
+        const rdNum = this.registerToNumber(rd);
+        
+        const binaryValue = 
+            (parseInt(instr.opcode, 2) << 26) |
+            (0 << 21) |     // rs = 0
+            (0 << 16) |     // rt = 0
+            (rdNum << 11) |
+            (0 << 6) |      // shamt = 0
+            funct;
+
+        return this.convertToHex(binaryValue);
+    } 
+    else if (op === "mthi" || op === "mtlo") {
+        // Formato: rs
+        const [rs] = operands;
+        const rsNum = this.registerToNumber(rs);
+        
+        const binaryValue = 
+            (parseInt(instr.opcode, 2) << 26) |
+            (rsNum << 21) | // rs
+            (0 << 16) |     // rt = 0
+            (0 << 11) |     // rd = 0
+            (0 << 6) |      // shamt = 0
+            funct;
+
+        return this.convertToHex(binaryValue);
+    } else if (["teq", "tge", "tgeu", "tlt", "tltu", "tne"].includes(op)) {
+        // Formato: rs, rt
+        const [rs, rt] = operands;
+        const rsNum = this.registerToNumber(rs);
+        const rtNum = this.registerToNumber(rt);
+
+        const binaryValue = 
+            (parseInt(instr.opcode, 2) << 26) |
+            (rsNum << 21) |     // rs
+            (rtNum << 16) |     // rt
+            (0 << 11) |         // rd = 0
+            (0 << 6) |          // shamt = 0
+            funct;
+
+        return this.convertToHex(binaryValue);
+    }else if (["sll", "sra", "srl"].includes(op)) {
+        const [rd, rt, shamt] = operands;
+        const shamtNum = parseInt(shamt);
+
+        if (shamtNum < 0 || shamtNum > 31) {
+            throw new Error(`Valor shamt inválido: ${shamt}`);
+        }
+
+        const binaryValue = (parseInt(instr.opcode, 2) << 26) |
+            (0 << 21) | // rs = 0
+            (this.registerToNumber(rt) << 16) |
+            (this.registerToNumber(rd) << 11) |
+            (shamtNum << 6) |
+            funct;
+
+        return this.convertToHex(binaryValue);
+    }else if (["sllv", "srav", "srlv"].includes(op)) {
+        const [rd, rt, rs] = operands;
+        
+        const binaryValue = (
+            (parseInt(instr.opcode, 2) << 26) |
+            (this.registerToNumber(rs) << 21) | // rs = registro fuente
+            (this.registerToNumber(rt) << 16) |
+            (this.registerToNumber(rd) << 11) |
+            (0 << 6) | // shamt = 0
+            funct
+        );
+        return this.convertToHex(binaryValue)
     }
 
     // Caso normal (add, sub, etc.)
@@ -163,55 +262,81 @@ class Line {
 }
 
     private iHandler(op: string, operands: string[]): string {
-        const instr = this.getInstructionInfo(op);
-        let rsNum = 0;
-        let rtNum = 0;
-        let immNum = 0;
-    
-        // Manejar casos especiales como lui
-        if (op === "lui") {
-            // Formato: lui rt, imm
-            rtNum = this.registerToNumber(operands[0]);
-            immNum = parseInt(operands[2], 16); // Usar base 16 para hex
-        } else if (op === "beq" || op === "bne") {
-            // Formato: beq/bne rs, rt, etiqueta
-        const [rs, rt, label] = operands;
+    const instr = this.getInstructionInfo(op);
+    let rsNum = 0;
+    let rtNum = 0;
+    let immNum = 0;
+
+    if (["lw", "sw", "lb", "lbu", "lh", "lhu", "sb", "sh"].includes(op)) {
+        const [rt, address] = operands;
+        
+        // Solo manejar formato offset($base)
+        const offsetMatch = address.match(/(-?\d+)\((\$?\w+)\)/);
+        if (!offsetMatch) throw new Error(`Formato inválido: ${address}`);
+        
+        const offset = parseInt(offsetMatch[1], 10);
+        const baseReg = offsetMatch[2];
+        
+        // Validar rango del offset
+        if (offset < -32768 || offset > 32767) {
+            throw new Error(`Offset excede 16 bits: ${offset}`);
+        }
+
+        rsNum = this.registerToNumber(baseReg);
+        rtNum = this.registerToNumber(rt);
+        immNum = offset & 0xffff; // Convertir a 16 bits con signo
+
+    } else if (op === "lui") {
+        // Manejar lui rt, imm
+        rtNum = this.registerToNumber(operands[0]);
+        immNum = parseInt(operands[1], 16) & 0xffff; // Imm de 16 bits
+
+    } else if (op === "beq" || op === "bne" || op === "bgtz" || op === "blez") {
+        let rs: string, label: string;
+        let rt: string = "$0";
+        
+        if (op === "bgtz" || op === "blez") {
+            [rs, label] = operands;
+            rtNum = 0;
+        } else {
+            [rs, rt, label] = operands;
+            rtNum = this.registerToNumber(rt);
+        }
+
+        rsNum = this.registerToNumber(rs);
+
+        let offset: number;
+        if (/^-?\d+$/.test(label)) {
+            offset = parseInt(label, 10);
+        } else {
+            const targetAddress = this.symbolTable.get(label);
+            if (!targetAddress) throw new Error(`Etiqueta no encontrada: ${label}`);
+            const currentPC = this.memAddress + 4;
+            offset = Math.floor((targetAddress - currentPC) / 4);
+        }
+
+        if (offset < -32768 || offset > 32767) {
+            throw new Error(`Offset inválido: ${offset}`);
+        }
+
+        immNum = offset & 0xffff;
+
+    } else {
+        // Otras instrucciones tipo I (addi, andi, etc.)
+        const [rt, rs, imm] = operands;
         rsNum = this.registerToNumber(rs);
         rtNum = this.registerToNumber(rt);
-
-        // Obtener dirección del label
-        const targetAddress = this.symbolTable.get(label);
-        if (targetAddress === undefined) {
-            throw new Error(`Etiqueta no encontrada: ${label}`);
-        }
-
-        // Calcular offset relativo (target - pc - 4) / 4
-        const currentPC = this.memAddress + 4; // PC + 4
-        const offset = Math.floor((targetAddress - currentPC) / 4);
-        
-        // Validar rango de 16 bits con signo
-        if (offset < -32768 || offset > 32767) {
-            throw new Error(`Offset de salto demasiado grande: ${offset}`);
-        }
-
-        immNum = offset & 0xffff; // Máscara de 16 bits
-        
-        } else {
-            // Resto de instrucciones I-Type
-            const [rt, rs, imm] = operands;
-            rsNum = this.registerToNumber(rs);
-            rtNum = this.registerToNumber(rt);
-            immNum = parseInt(imm, 10) & 0xffff;
-        }
-    
-        const binaryValue = 
-            (parseInt(instr.opcode, 2) << 26) |
-            (rsNum << 21) |
-            (rtNum << 16) |
-            immNum;
-    
-        return this.convertToHex(binaryValue);
+        immNum = parseInt(imm, 10) & 0xffff;
     }
+
+    const binaryValue = 
+        (parseInt(instr.opcode, 2) << 26) |
+        (rsNum << 21) |
+        (rtNum << 16) |
+        immNum;
+
+    return this.convertToHex(binaryValue);
+}
 
 
     private jHandler(op: string, operands: string[]): string {
@@ -226,8 +351,7 @@ class Line {
     
         // Calcular dirección relativa (en palabras)
         const relativeAddress = targetAddress >>> 2; // Dividir entre 4
-        
-        // Construir valor binario: opcode (6) | address (26)
+
         const binaryValue = 
             (parseInt(instr.opcode, 2) << 26) |
             (relativeAddress & 0x03ffffff); // Máscara de 26 bits
@@ -242,25 +366,25 @@ class Line {
     }
 
     assemble(): string {
-        let output = "";
+        let hexCode = "";
         
         if (this.lineType === LineType.LABEL) {
-            output += `${memDechex(this.memAddress)}: <${this.label}>`;
+            hexCode  = `${memDechex(this.memAddress)}: <${this.label}>`;
         } else if ([LineType.R, LineType.I, LineType.J, LineType.SYSCALL].includes(this.lineType)) {
-            output += `\t${memDechex(this.memAddress)}: `;
+            hexCode  = `\t${memDechex(this.memAddress)}: `;
         }
 
         switch(this.lineType) {
             case LineType.R:
-                output += this.rHandler(this.op, this.operands);
+                hexCode  = this.rHandler(this.op, this.operands);
                 break;
                 
             case LineType.I:
-                output += this.iHandler(this.op, this.operands);
+                hexCode  = this.iHandler(this.op, this.operands);
                 break;
                 
             case LineType.J:
-                output += this.jHandler(this.op, this.operands);
+                hexCode  = this.jHandler(this.op, this.operands);
                 break;
 
                 case LineType.SYSCALL: {
@@ -270,7 +394,7 @@ class Line {
                         (0x00 << 16) | // rt
                         (0x00 << 6) |  // shamt
                         0x0c;          // funct
-                    output += this.convertToHex(binaryValue);
+                        hexCode  = this.convertToHex(binaryValue);
                     break;
                 }
                 
@@ -282,7 +406,7 @@ class Line {
                         (0 << 21) |    // rs no usado
                         (this.registerToNumber(this.op) << 16 |
                         upper);
-                    output += this.convertToHex(binaryValue);
+                        hexCode  = this.convertToHex(binaryValue);
                     break;
                 }
                 
@@ -294,12 +418,12 @@ class Line {
                         (this.registerToNumber(this.op) << 21) |
                         (this.registerToNumber(this.op) << 16 |
                         lower);
-                    output += this.convertToHex(binaryValue);
+                        hexCode  = this.convertToHex(binaryValue);
                     break;
                 }
         }
 
-        return output;
+        return `${memDechex(this.memAddress)}: ${hexCode}`;
     }
 }
 
@@ -311,14 +435,12 @@ function assembleFull(input: string): string {
     const symbolTable = new Map<string, number>();
     const dataAddressStart = 0x00c00000;
     const textAddressStart = 0x00400000;
-    let dataAddress = dataAddressStart;
-    
-    // Primera pasada: recolectar etiquetas
     let currentAddress = textAddressStart;
     const parsedLines: Line[] = [];
     let dataSection = false;
+    const outputJSON: { [key: string]: string } = {};
 
-    // Procesar secciones .data y .text
+    // Primera pasada: construir tabla de símbolos
     for (const lineStr of lines) {
         if (lineStr.startsWith('#')) continue;
         
@@ -340,164 +462,228 @@ function assembleFull(input: string): string {
             symbolTable.set(label, currentAddress);
         }
 
-        if (!dataSection) { // Sección de texto
+        if (!dataSection && !lineStr.startsWith('.')) {
             const line = new Line(symbolTable);
-            line.originalCode = lineStr;
+            line.originalCode = lineStr.replace(/^\s*/, '');
             line.memAddress = currentAddress;
+            
+            const parts = lineStr.trim().split(/[\s,]+/).filter(p => p);
+            if (parts.length === 0) continue;
+
+            if (parts[0].endsWith(':')) continue; // Ignorar etiquetas en parsedLines
+            
             parsedLines.push(line);
-            currentAddress += 4; // Avanzar dirección
+            currentAddress += 4;
         }
-
-        if (dataSection) {
-            if (lineStr.includes(".word")) {
-                const [labelPart, valuePart] = lineStr.split(/\.word\s+/);
-                const labelMatch = labelPart.match(/(\w+):/);
-                
-                if (labelMatch) {
-                    symbolTable.set(labelMatch[1], dataAddress);
-                    dataAddress += 4; // Avanzar dirección de datos
-                }
-            }
-        }
-
-
     }
 
-    // Segunda pasada: generar código
-    let output = "";
+    // Segunda pasada: generar JSON
     for (const line of parsedLines) {
         const parts = line.originalCode.split(/[\s,]+/).filter(p => p);
-        if (parts.length === 0) continue;
+        if (parts.length === 0 || parts[0].startsWith('#')) continue;
 
-        // Manejar etiquetas y comentarios
-        if (parts[0].endsWith(':')) {
-            line.lineType = LineType.LABEL;
-            line.label = parts[0].slice(0, -1);
-        } else if (parts[0].startsWith('#')) {
-            line.lineType = LineType.COMMENT;
-        } else {
-            line.op = parts[0].toLowerCase();
-            line.operands = parts.slice(1);
-            
-            // Determinar tipo de instrucción
-            if (instructionMap[line.op]?.opcode === "000000") {
-                line.lineType = LineType.R;
-            } else if (line.op === 'la') {
-                // Expandir pseudoinstrucción
-                const addr = symbolTable.get(line.operands[1]) || 0;
+        line.op = parts[0].toLowerCase();
+        line.operands = parts.slice(1);
+
+        try {
+            if (line.op === 'la') {
+                // Manejar pseudoinstrucción la
+                const rt = line.operands[0];
+                const label = line.operands[1];
+                const addr = symbolTable.get(label) || 0;
+                
+                if (addr === 0) throw new Error(`Etiqueta no definida: ${label}`);
+                
+                // Generar lui
                 const upper = (addr >> 16) & 0xffff;
-                const lower = addr & 0xffff;
-                
-                // Crear línea lui
+                const luiCode = `lui ${rt}, 0x${upper.toString(16)}`;
                 const luiLine = new Line(symbolTable);
+                luiLine.op = 'lui';
+                luiLine.operands = [rt, `0x${upper.toString(16)}`];
                 luiLine.lineType = LineType.I;
-                luiLine.op = "lui";
-                luiLine.operands = [line.operands[0], `0x${upper.toString(16)}`];
-                output += luiLine.assemble() + '\n';
+                const luiHex = luiLine.assemble().split(': ')[1]?.trim();
                 
-                // Crear línea ori
+                // Generar ori
+                const lower = addr & 0xffff;
+                const oriCode = `ori ${rt}, ${rt}, 0x${lower.toString(16)}`;
                 const oriLine = new Line(symbolTable);
+                oriLine.op = 'ori';
+                oriLine.operands = [rt, rt, `0x${lower.toString(16)}`];
                 oriLine.lineType = LineType.I;
-                oriLine.op = "ori";
-                oriLine.operands = [line.operands[0], line.operands[0], `0x${lower.toString(16)}`];
-                output += oriLine.assemble() + '\n';
-                
-                continue;
-            } else if (['j', 'jal'].includes(line.op)) {
-                line.lineType = LineType.J;
-            } else if (line.op === 'syscall') {
-                line.lineType = LineType.SYSCALL;
+                const oriHex = oriLine.assemble().split(': ')[1]?.trim();
 
-            } else if (line.op === 'nop') {
-                line.op = 'sll';
-                line.operands = ['$zero', '$zero', '0'];
-                line.lineType = LineType.R;
+                if (luiHex) outputJSON[luiCode] = luiHex;
+                if (oriHex) outputJSON[oriCode] = oriHex;
+            } else {
+                // Determinar tipo de instrucción
+                if (instructionMap[line.op]?.opcode === "000000") {
+                    line.lineType = LineType.R;
+                } else if (['j', 'jal'].includes(line.op)) {
+                    line.lineType = LineType.J;
+                } else if (line.op === 'syscall') {
+                    line.lineType = LineType.SYSCALL;
+                } else if (line.op === 'nop') {
+                    line.op = 'sll';
+                    line.operands = ['$zero', '$zero', '0'];
+                    line.lineType = LineType.R;
+                } else {
+                    line.lineType = LineType.I;
+                }
+
+                const hex = line.assemble().split(': ')[1]?.trim();
+                if (hex) outputJSON[line.originalCode] = hex;
             }
-            
-            else {
-                line.lineType = LineType.I;
-            }
+        } catch (e) {
+            console.error(`Error ensamblando: ${line.originalCode}`, e);
         }
-
-        output += line.assemble() + '\n';
     }
-    
-    return output;
-}
 
+    return JSON.stringify(outputJSON, null, 4);
+}
 /*
-const testCode = `
-                .data                   
+const testCode =`
+     .data
+
     .text
     main:
-        addi $s0, $zero, 1       # $s0 = 1
-        addi $s1, $zero, 5       # $s1 = 5
-        addi $s2, $zero, 10      # $s2 = 10
-        addi $t0, $zero, 1       # $t0 = 1
-        addi $t1, $zero, 2       # $t1 = 2
-        addi $t2, $zero, 3       # $t2 = 3
-        addi $t3, $zero, 4       # $t3 = 4
-        j fine                   # Salto a "fine"
+        lui $t0, 0x00c0      
+        ori $t0, $t0, 0x0000  
+
+        addi $s0, $zero, 1      
+        addi $s1, $zero, 5      
+        addi $s2, $zero, 10     
+        
+        lw $t1, 0($t0)         
+        lh $t2, 4($t0)        
+        
+        sw $s0, 0($t5)        
+        sh $s1, 6($t0)        
+        
+        addi $t2, $zero, 3       
+        addi $t3, $zero, 4     
+        j fine
 
     somma:
-        add $s3, $s1, $s2        # $s3 = $s1 + $s2
-        j fine                   # Salto a "fine"
+        add $s3, $s1, $s2        
+        lw $t4, 0($t5)          
+        j fine
 
     sottrazione:
-        sub $s3, $s1, $s2        # $s3 = $s1 - $s2
-        j fine                   # Salto a "fine"
+        sub $s3, $s1, $s2       
+        sw $s3, 8($t0)         
+        j fine
 
-    molt:
-        mult $s1, $s2            # $s1 * $s2, resultado en HI y LO
-        j fine                   # Salto a "fine"
+
+     molt:
+        mult $s1, $s2            
+        j fine                   
 
     div:
-        div $s1, $s2             # $s1 / $s2, cociente en LO y residuo en HI
-        j fine                   # Salto a "fine"
+        div $s1, $s2             
+        j fine                  
 
     or:
-        or $s3, $s1, $s2         # $s3 = $s1 | $s2 (OR bit a bit)
-        j fine                   # Salto a "fine"
+        or $s3, $s1, $s2         
+        j fine                   
 
     and:
-        and $s3, $s1, $s2        # $s3 = $s1 & $s2 (AND bit a bit)
-        j fine                   # Salto a "fine"
+        and $s3, $s1, $s2        
+        j fine                   
 
     andi:
-        andi $s3, $s1, 0x0F      # $s3 = $s1 & 0x0F (AND con un valor inmediato)
-        j fine                   # Salto a "fine"
+        andi $s3, $s1, 0x0F     
+        j fine                   
 
     xor:
-        xor $s3, $s1, $s2        # $s3 = $s1 ^ $s2 (XOR bit a bit)
-        j fine                   # Salto a "fine"
+        xor $s3, $s1, $s2       
+        j fine                  
 
     fine:
-
-
-`;
+        sh $s2, 12($t0)
+        xori $t3 $t7 50745  
+        j main 
+        addu $t1 $t4 $t3
+        jal xor
+        nop
+`
 */
+
 /*
 const testCode = `
     .data
-    my_data: .word 0x1234
+    array: .word 0x1234, 0x5678
     
     .text
     main:
-        la $t0, my_data    # Debería generar lui + ori
+        la $t0, array       # Cargar dirección del array
+        lw $t1, 0($t0)      # Cargar primer elemento
+        sw $t2, 4($t0)      # Almacenar en segunda posición
+        lb $t3, 2($t0)      # Cargar byte
+        sh $t4, 6($t0)      # Almacenar half-word
 `;
 */
 
+
 const testCode = `
     .text
-    main:
-        addi $s0, $zero, 5    
-        addi $s1, $zero, 5   
-        beq  $s0, $s1, equal  
-        addi $t0, $zero, 1  
-    equal:
-        addi $t0, $zero, 42   
-        bne  $s0, $s1, main  
-`;
+    add $t0, $t1, $t2
+    sub $t3, $t4, $t5
+    and $t6, $t7, $t8
+    or $t9, $s0, $s1
+    jalr $s2, $s3    
+    jr $s4            
+    slt $s5, $s6, $s7
+    mfhi $t0          
+    mflo $t1          
+    mthi $t2          
+    mtlo $t3          
+    teq $t5, $t4      
+    tge $t6, $t7      
+    tgeu $t8, $t9     
+    tlt $s0, $s1      
+    tltu $s2, $s3     
+    tne $s4, $s5     
+    addu $s6, $s7, $t0
+    div $t1, $t2
+    divu $t3, $t4     
+    mult $t5, $t6
+    multu $t7, $t8    
+    nor $t9, $s0, $s1
+    sll $s2, $s3, 1    
+    sllv $s4, $s5, $s6
+    sra $s7, $t0, 2     
+    srav $t1, $t2, $t3
+    srl $t4, $t5, 3
+    srlv $t6, $t7, $t8
+    subu $t9, $s0, $s1
+    xor $s2, $s3, $s4
+    addi $s5, $s6, 100
+    addiu $s7, $t0, 200
+    andi $t1, $t2, 0xFF
+    ori $t3, $t4, 0x0F
+    xori $t5, $t6, 0xAA
+    lw $t7, 0($sp)
+    sw $t8, 4($sp)
+    lb $t9, 8($sp)
+    lbu $s0, 12($sp)
+    lh $s1, 16($sp)
+    lhu $s2, 20($sp)
+    sb $s3, 24($sp)
+    sh $s4, 28($sp)
+    beq $s5, $s6, fine
+    bne $s7, $t0, fine
+    bgtz $t1, 0        
+    blez $t2, 0        
+    j fine
+    jal fine
+    lui $t3, 0x1234
+    nop
+    fine: 
 
+`
 console.log("=== Resultado del Ensamblado ===");
+
+//Llamar a la funcion principal
 console.log(assembleFull(testCode));
+// const instructionNames: string[] = Object.keys(instructionMap);
+//  console.log(instructionNames);
