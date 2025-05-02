@@ -8,6 +8,14 @@
     height: 60px;
     text-align: center;
 }
+
+.error-header {
+    background-color: rgba(226, 85, 85, 0.96);
+    height: 50%;
+    width:100%;
+    text-align: center;
+  }
+
 .infocard-header{
     background-color: rgba(85, 226, 226, 0.96);
     height: 50%;

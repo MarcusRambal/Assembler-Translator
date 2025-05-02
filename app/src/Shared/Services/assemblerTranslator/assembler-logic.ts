@@ -535,6 +535,11 @@ export function assembleFull(input: string): string {
             }
         } catch (e) {
             console.error(`Error ensamblando: ${line.originalCode}`, e);
+            if (e instanceof Error) {
+                outputJSON[line.originalCode] = `Error: ${e.message}`;
+              } else {
+                outputJSON[line.originalCode] = `Error desconocido`;
+              }
         }
     }
 
