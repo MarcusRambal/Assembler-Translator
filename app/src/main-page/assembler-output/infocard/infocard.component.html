@@ -1,7 +1,9 @@
 <div class="infocard-container">
-    <div class="infocard-header">
-        {{ header }}
-    </div>
+    <div
+    [class]="text && text.toLowerCase().includes('error:') ? 'error-header' : 'infocard-header'">
+
+  {{ header }}
+</div>
     <div class = "infocard-text">
         {{ text }}
     </div>
